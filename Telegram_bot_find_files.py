@@ -300,7 +300,7 @@ if __name__ == '__main__':
     Telegram_bot_find_files(
         bot_token = 'your bot_token',
         dropbox_token = 'your dropbox_token',
-        access_list = [
+        user_list = [
             # your user list
             # chat_id or uid
         ],
@@ -311,4 +311,3 @@ if __name__ == '__main__':
         find_dir_root = '/sample/data',
         work_dir_root = 'bot/work_dir'
     )
-    
