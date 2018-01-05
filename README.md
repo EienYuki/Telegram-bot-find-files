@@ -8,7 +8,7 @@
 
 /load //載入檔案清單
 
-以上這三個指令 預設是給管理員用的  ＰＳ：在 instruction_list 可修改不同身份可以使用的指令
+以上這三個指令 預設是給管理員用的  (instruction_list 可修改不同身份可以使用的指令)
 
 /get_uid //取得userid可用於在程式碼中的 user_list ＆ admin_list
 
