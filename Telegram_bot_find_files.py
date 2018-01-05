@@ -1,23 +1,59 @@
 # coding: utf-8
+# 作者：EienYuki
 # https://github.com/EienYuki
 
 import dropbox
 import hashlib
-import os, random
+import os, time, random
 from telegram.ext import Updater
 from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 
 class Telegram_bot_find_files():
-    def access_check(self, input_id, id_list):
-        print("access_check")
-        if input_id in id_list:
-            return True
+
+    def log(self, info='', args=''):
+        if args is '':
+            print(time.strftime("%H:%M:%S", time.localtime()), info)
         else:
-            return False
+            print(time.strftime("%H:%M:%S", time.localtime()), info, ' '.join(args))
+
+    def access_check(self, update):
+        self.log(info='access_check')
+
+        instruction = update.message.text.split()[0]
+        aflag = False
+        utype = 'guest'
+        
+        while True:
+            if update.message.chat_id in self.user_list:
+                utype = 'user'
+            if update.message.from_user.id in self.user_list:
+                utype = 'user'
+
+            if update.message.chat_id in self.admin_list:
+                utype = 'admin'
+            if update.message.from_user.id in self.admin_list:
+                utype = 'admin'
+
+            if utype is 'guest':
+                if instruction in self.guest_instruction_list:
+                    aflag = True
+                    break
+            if utype is 'user':
+                if instruction in self.user_instruction_list:
+                    aflag = True
+                    break
+            if utype is 'admin':
+                if instruction in self.admin_instruction_list:
+                    aflag = True
+                    break
+        
+        self.log(info="%s %s %s use %s in %s" % ('Accept' if aflag is True else 'Drop' ,utype, update.message.from_user.username, instruction, update.message.chat_id), args=update.message.text.split()[1:])
+        return aflag
 
     def get_file_list(self, root_path):
-        print("get_file_list")
+        self.log(info='get_file_list')
+
         out = []
         for root, dirs, files in os.walk(root_path):
             for r in files:
@@ -25,13 +61,15 @@ class Telegram_bot_find_files():
         return out
 
     def save_list(self, path, input_list):
-        print("save_list")
+        self.log(info='save_list')
+
         with open(path, "w") as f:
             for s in input_list:
                 f.write(str(s) +"\n")
 
     def load_list(self, path):
-        print("load_list")
+        self.log(info='load_list')
+
         out = []
         with open(path, "r") as f:
             for line in f:
@@ -41,8 +79,8 @@ class Telegram_bot_find_files():
     def upload_file(self, path):
         # dropbox-api – Uploading a file using the Dropbox Python SDK - CodeDay
         # https://www.codeday.top/2017/10/24/52483.html
+        self.log(info='upload_file')
 
-        print("upload_file")
         dest_path = '/%s' % os.path.basename(path)
         dbx = dropbox.Dropbox(self.dropbox_token)
 
@@ -72,8 +110,7 @@ class Telegram_bot_find_files():
 
 
     def _update(self, bot, update):
-        print("_update")
-        if self.access_check(update.message.chat_id, self.admin_list):
+        if self.access_check(update):
             self.tmp_all_file_list = self.get_file_list(self.find_dir_root)
             self.tmp_find_file_dict = {}
             self.tmp_find_csv_list = []
@@ -82,28 +119,33 @@ class Telegram_bot_find_files():
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
 
     def _save(self, bot, update):
-        print("_save")
-        if self.access_check(update.message.chat_id, self.admin_list):
+        if self.access_check(update):
             self.save_list("%s/file.list" % self.work_dir_root, self.tmp_all_file_list)
             update.message.reply_text('完成')
         else:
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
 
     def _load(self, bot, update):
-        print("_load")
-        if self.access_check(update.message.chat_id, self.admin_list):
+        if self.access_check(update):
             self.tmp_all_file_list = self.load_list("%s/file.list" % self.work_dir_root)
             update.message.reply_text('完成')
         else:
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
     
     def _get_chatid(self, bot, update):
-        print("_get_chatid")
-        bot.send_message(chat_id=update.message.chat_id, text=update.message.chat_id)
+        if self.access_check(update):
+            bot.send_message(chat_id=update.message.chat_id, text=update.message.chat_id)
+        else:
+            bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
+
+    def _get_uid(self, bot, update):
+        if self.access_check(update):
+            bot.send_message(chat_id=update.message.chat_id, text=update.message.from_user.id)
+        else:
+            bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
 
     def _help(self, bot, update):
-        print("_help")
-        if self.access_check(update.message.chat_id, self.access_list):
+        if self.access_check(update):
             Msg_text = "☆ ★ ☆ ★ 使用方式 ★ ☆ ★ ☆\n"
             Msg_text += "先使用 find_data 找尋檔案\n"
             Msg_text += "之後複製列表中 的資源編號\n"
@@ -120,13 +162,13 @@ class Telegram_bot_find_files():
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
 
     def _find_data(self, bot, update, args):
-        print("_find_data")
-        if self.access_check(update.message.chat_id, self.access_list):
+        if self.access_check(update):
             out_msg = ""
             count = 0
             text_caps = ' '.join(args)
             tp_path = "%s/find[%s].csv" % (self.work_dir_root, text_caps)
 
+            # /abc(.*).data  == abc*.data
             if not text_caps in self.tmp_find_csv_list:
                 sha_1 = hashlib.sha1()
                 tp_now_find = ["ID,檔案"]
@@ -146,9 +188,8 @@ class Telegram_bot_find_files():
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
 
     def _get_link(self, bot, update, args):
-        print("_get_link")
-        text_caps = ' '.join(args)
-        if self.access_check(update.message.chat_id, self.access_list):
+        if self.access_check(update):
+            text_caps = ' '.join(args)
             if text_caps in self.tmp_find_file_dict:
                 if os.path.isfile(self.tmp_find_file_dict[text_caps]):
                     link = self.upload_file(self.tmp_find_file_dict[text_caps])
@@ -160,40 +201,42 @@ class Telegram_bot_find_files():
         else:
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
 
-    def _test(self, bot, update):
-        print("_test")
-        sticker_list = [
-            'CAADBQADPgIAAkpxYgrrtBKXMyXpZAI',
-            'CAADBQADPwIAAkpxYgoDlPO5cfOM5gI',
-            'CAADBQADQAIAAkpxYgrJjvslPudKXAI',
-            'CAADBQADQgIAAkpxYgqdfXltSeQaSQI',
-            'CAADBQADRAIAAkpxYgoqSxC6sJ6xQgI',
-            'CAADBQADRgIAAkpxYgpyI057U7bl2wI',
-            'CAADBQADSAIAAkpxYgrx8eXrsxb3sQI',
-            'CAADBQADSgIAAkpxYgo_4ArvZA8jdwI',
-            'CAADBQADTAIAAkpxYgpdr56IH4-e9gI',
-            'CAADBQADTwIAAkpxYgoL37OO2La_1wI',
-            'CAADBQADUgIAAkpxYgplByKEYErOPAI',
-            'CAADBQADVAIAAkpxYgq4QDly8hiQJAI',
-            'CAADBQADVwIAAkpxYgqczRho4u07_AI',
-            'CAADBQADWQIAAkpxYgpM0sy4QlAwgQI',
-            'CAADBQADWwIAAkpxYgoYdhJIkB9FhAI',
-            'CAADBQADXQIAAkpxYgoFajuoPh2yXgI',
-            'CAADBQADXwIAAkpxYgowSDcxLzqBOQI',
-            'CAADBQADYQIAAkpxYgoM2gJH_fWoqQI',
-            'CAADBQADYwIAAkpxYgpUCG5lsn3nvgI',
-            'CAADBQADZQIAAkpxYgqzOa9HKo3-SwI',
-            'CAADBQADxQIAAkpxYgohOqLzysYoEgI',
-            'CAADBQADxwIAAkpxYgr3F9TBr9lSkQI',
-            'CAADBQADyQIAAkpxYgq2fY5Utae6zAI'
-        ]
-        update.message.reply_text('嗨 你好！')
-        bot.sendSticker(chat_id=update.message.chat_id, sticker=random.choice(sticker_list))
+    def _test(self, bot, update): 
+        if self.access_check(update):
+            sticker_list = [
+                'CAADBQADPgIAAkpxYgrrtBKXMyXpZAI',
+                'CAADBQADPwIAAkpxYgoDlPO5cfOM5gI',
+                'CAADBQADQAIAAkpxYgrJjvslPudKXAI',
+                'CAADBQADQgIAAkpxYgqdfXltSeQaSQI',
+                'CAADBQADRAIAAkpxYgoqSxC6sJ6xQgI',
+                'CAADBQADRgIAAkpxYgpyI057U7bl2wI',
+                'CAADBQADSAIAAkpxYgrx8eXrsxb3sQI',
+                'CAADBQADSgIAAkpxYgo_4ArvZA8jdwI',
+                'CAADBQADTAIAAkpxYgpdr56IH4-e9gI',
+                'CAADBQADTwIAAkpxYgoL37OO2La_1wI',
+                'CAADBQADUgIAAkpxYgplByKEYErOPAI',
+                'CAADBQADVAIAAkpxYgq4QDly8hiQJAI',
+                'CAADBQADVwIAAkpxYgqczRho4u07_AI',
+                'CAADBQADWQIAAkpxYgpM0sy4QlAwgQI',
+                'CAADBQADWwIAAkpxYgoYdhJIkB9FhAI',
+                'CAADBQADXQIAAkpxYgoFajuoPh2yXgI',
+                'CAADBQADXwIAAkpxYgowSDcxLzqBOQI',
+                'CAADBQADYQIAAkpxYgoM2gJH_fWoqQI',
+                'CAADBQADYwIAAkpxYgpUCG5lsn3nvgI',
+                'CAADBQADZQIAAkpxYgqzOa9HKo3-SwI',
+                'CAADBQADxQIAAkpxYgohOqLzysYoEgI',
+                'CAADBQADxwIAAkpxYgr3F9TBr9lSkQI',
+                'CAADBQADyQIAAkpxYgq2fY5Utae6zAI'
+            ]
+            update.message.reply_text('嗨 你好！')
+            bot.sendSticker(chat_id=update.message.chat_id, sticker=random.choice(sticker_list))
+        else:
+            bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
     
     
-    def __init__(self, bot_token, dropbox_token, access_list, admin_list, find_dir_root, work_dir_root):
+    def __init__(self, bot_token, dropbox_token, user_list, admin_list, find_dir_root, work_dir_root):
         self.dropbox_token = dropbox_token
-        self.access_list = access_list
+        self.user_list = user_list
         self.admin_list = admin_list
 
         self.find_dir_root = find_dir_root
@@ -203,11 +246,40 @@ class Telegram_bot_find_files():
         self.tmp_find_csv_list = []
         self.tmp_find_file_dict = {}
 
+
+        self.guest_instruction_list = [
+            '/get_uid',
+            '/get_chatid',
+            '/test'
+        ]
+        self.user_instruction_list = [
+            '/get_uid',
+            '/get_chatid',
+            '/test',
+
+            '/help',
+            '/find_data',
+            '/get_link'
+        ]
+        self.admin_instruction_list = [
+            '/get_uid',
+            '/get_chatid',
+            '/test',
+
+            '/help',
+            '/find_data',
+            '/get_link',
+
+            '/update',
+            '/save',
+            '/load'
+        ]
         self.drop_sticker_id = 'CAADBQADlQIAAt3DvwhTu-o-F2gRBwI'
 
         self.updater = Updater(token=bot_token)
         dispatcher = self.updater.dispatcher
 
+        dispatcher.add_handler( CommandHandler('get_uid', self._get_uid) )
         dispatcher.add_handler( CommandHandler('get_chatid', self._get_chatid) )
         dispatcher.add_handler( CommandHandler('test', self._test) )
 
@@ -221,20 +293,22 @@ class Telegram_bot_find_files():
         dispatcher.add_handler( CommandHandler('get_link', self._get_link, pass_args=True) )
 
         self.updater.start_polling()
-        print("start bot")
+        self.log(info='start bot')
 
 if __name__ == '__main__':
+
     Telegram_bot_find_files(
         bot_token = 'your bot_token',
         dropbox_token = 'your dropbox_token',
         access_list = [
-            # chat_id list
-            # your allow access list
+            # your user list
+            # chat_id or uid
         ],
         admin_list = [
-            # chat_id list
             # your admin list
+            # chat_id or uid
         ],
         find_dir_root = '/sample/data',
         work_dir_root = 'bot/work_dir'
     )
+    
