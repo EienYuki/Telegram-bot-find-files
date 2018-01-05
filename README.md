@@ -8,9 +8,11 @@
 
 /load //載入檔案清單
 
-以上這三個指令是給管理員用的
+以上這三個指令 預設是給管理員用的  ＰＳ：在 instruction_list 可修改不同身份可以使用的指令
 
-/get_chatid //取得chatid可用於在程式碼中的 access_list ＆ admin_list
+/get_uid //取得userid可用於在程式碼中的 user_list ＆ admin_list
+
+/get_chatid //取得chatid可用於在程式碼中的 user_list ＆ admin_list
 
 /find_data //找尋檔案 並回傳一個 csv檔
 
