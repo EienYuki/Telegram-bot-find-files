@@ -9,7 +9,7 @@ from telegram.ext import Updater
 from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 
-class Telegram_bot_find_files():
+class Yuki_bot():
 
     def log(self, info='', args=''):
         if args is '':
@@ -20,7 +20,7 @@ class Telegram_bot_find_files():
     def access_check(self, update):
         self.log(info='access_check')
 
-        instruction = update.message.text.split()[0]
+        instruction = update.message.text.split()[0].split(self.bot_id)[0]
         aflag = False
         utype = 'guest'
         
@@ -47,8 +47,9 @@ class Telegram_bot_find_files():
                 if instruction in self.admin_instruction_list:
                     aflag = True
                     break
+            break
         
-        self.log(info="%s %s %s use %s in %s" % ('Accept' if aflag is True else 'Drop' ,utype, update.message.from_user.username, instruction, update.message.chat_id), args=update.message.text.split()[1:])
+        self.log(info="%s %s %s use %s in %s" % ('Accept' if aflag is True else 'Drop' , utype, update.message.from_user.username, instruction, update.message.chat_id), args=update.message.text.split()[1:])
         return aflag
 
     def get_file_list(self, root_path):
@@ -111,23 +112,32 @@ class Telegram_bot_find_files():
 
     def _update(self, bot, update):
         if self.access_check(update):
-            self.tmp_all_file_list = self.get_file_list(self.find_dir_root)
+
+            tmpd = self.get_file_list(self.find_dir_root)
+            if not self.tmp_file_list is None:
+                self.tmp_file_diff_list = list(set(tmpd) - set(self.tmp_file_list))
+            else:
+                self.tmp_file_diff_list = []
+
+            self.tmp_file_list = tmpd
             self.tmp_find_file_dict = {}
             self.tmp_find_csv_list = []
+
             update.message.reply_text('完成')
         else:
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
 
     def _save(self, bot, update):
         if self.access_check(update):
-            self.save_list("%s/file.list" % self.work_dir_root, self.tmp_all_file_list)
+            self.save_list("%s/file.list" % self.work_dir_root, self.tmp_file_list)
             update.message.reply_text('完成')
         else:
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
 
     def _load(self, bot, update):
         if self.access_check(update):
-            self.tmp_all_file_list = self.load_list("%s/file.list" % self.work_dir_root)
+            self.tmp_file_diff_list = []
+            self.tmp_file_list = self.load_list("%s/file.list" % self.work_dir_root)
             update.message.reply_text('完成')
         else:
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
@@ -143,6 +153,16 @@ class Telegram_bot_find_files():
             bot.send_message(chat_id=update.message.chat_id, text=update.message.from_user.id)
         else:
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
+
+    def _set_status(self, bot, update, args):
+        if self.access_check(update):
+            text_caps = ' '.join(args)
+            tmp = text_caps.split('|')
+            self.tmp_status[tmp[0]] = True if tmp[1] is 'T' else False
+            update.message.reply_text('完成')
+        else:
+            bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
+            
 
     def _help(self, bot, update):
         if self.access_check(update):
@@ -161,25 +181,33 @@ class Telegram_bot_find_files():
         else:
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
 
+    def _diff(self, bot, update): 
+        if self.access_check(update):
+            if self.tmp_file_diff_list is None or self.tmp_file_diff_list == []:
+                Msg_text = "檔案沒有變化"
+                bot.send_message(chat_id=update.message.chat_id, text=Msg_text)
+            else:
+                tp_path = "%s/diff.csv" % (self.work_dir_root)
+                self.save_list(tp_path,self.tmp_file_diff_list)
+                bot.send_document(chat_id=update.message.chat_id, document=open(tp_path, 'rb'))
+        else:
+            bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
+
     def _find_data(self, bot, update, args):
         if self.access_check(update):
-            out_msg = ""
-            count = 0
             text_caps = ' '.join(args)
             tp_path = "%s/find[%s].csv" % (self.work_dir_root, text_caps)
 
-            # /abc(.*).data  == abc*.data
             if not text_caps in self.tmp_find_csv_list:
                 sha_1 = hashlib.sha1()
                 tp_now_find = ["ID,檔案"]
-                for r in self.tmp_all_file_list:
+                for r in self.tmp_file_list:
                     if text_caps in r:
                         sha_1.update(r.encode())
                         tid = sha_1.hexdigest()
                         if not tid in self.tmp_find_file_dict:
                             self.tmp_find_file_dict[tid] = r
                         tp_now_find.append(tid+","+r.strip())
-                        count +=1
                 self.save_list(tp_path,tp_now_find)
                 self.tmp_find_csv_list.append(text_caps)
             
@@ -234,7 +262,8 @@ class Telegram_bot_find_files():
             bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
     
     
-    def __init__(self, bot_token, dropbox_token, user_list, admin_list, find_dir_root, work_dir_root):
+    def __init__(self, bot_id, bot_token, dropbox_token, user_list, admin_list, find_dir_root, work_dir_root):
+        self.bot_id = bot_id
         self.dropbox_token = dropbox_token
         self.user_list = user_list
         self.admin_list = admin_list
@@ -242,9 +271,15 @@ class Telegram_bot_find_files():
         self.find_dir_root = find_dir_root
         self.work_dir_root = work_dir_root
 
-        self.tmp_all_file_list = []
+        self.tmp_file_list = None
+        self.tmp_file_diff_list = None
         self.tmp_find_csv_list = []
         self.tmp_find_file_dict = {}
+
+        self.tmp_status = {
+            'OpenVPN':True,
+            'Media':True
+        }
 
 
         self.guest_instruction_list = [
@@ -258,6 +293,7 @@ class Telegram_bot_find_files():
             '/test',
 
             '/help',
+            '/diff',
             '/find_data',
             '/get_link'
         ]
@@ -267,9 +303,11 @@ class Telegram_bot_find_files():
             '/test',
 
             '/help',
+            '/diff',
             '/find_data',
             '/get_link',
 
+            '/set_status',
             '/update',
             '/save',
             '/load'
@@ -284,11 +322,13 @@ class Telegram_bot_find_files():
         dispatcher.add_handler( CommandHandler('test', self._test) )
 
         dispatcher.add_handler( CommandHandler('help', self._help) )
+        dispatcher.add_handler( CommandHandler('set_status', self._set_status, pass_args=True) )
 
         dispatcher.add_handler( CommandHandler('update', self._update) )
         dispatcher.add_handler( CommandHandler('save', self._save) )
         dispatcher.add_handler( CommandHandler('load', self._load) )
 
+        dispatcher.add_handler( CommandHandler('diff', self._diff) )
         dispatcher.add_handler( CommandHandler('find_data', self._find_data, pass_args=True) )
         dispatcher.add_handler( CommandHandler('get_link', self._get_link, pass_args=True) )
 
@@ -298,6 +338,7 @@ class Telegram_bot_find_files():
 if __name__ == '__main__':
 
     Telegram_bot_find_files(
+        bot_id = '@your bot_id',
         bot_token = 'your bot_token',
         dropbox_token = 'your dropbox_token',
         user_list = [
