@@ -9,7 +9,7 @@ from telegram.ext import Updater
 from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 
-class Yuki_bot():
+class Telegram_bot_find_files():
 
     def log(self, info='', args=''):
         if args is '':
@@ -152,17 +152,7 @@ class Yuki_bot():
         if self.access_check(update):
             bot.send_message(chat_id=update.message.chat_id, text=update.message.from_user.id)
         else:
-            bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
-
-    def _set_status(self, bot, update, args):
-        if self.access_check(update):
-            text_caps = ' '.join(args)
-            tmp = text_caps.split('|')
-            self.tmp_status[tmp[0]] = True if tmp[1] is 'T' else False
-            update.message.reply_text('完成')
-        else:
-            bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)
-            
+            bot.sendSticker(chat_id=update.message.chat_id, sticker=self.drop_sticker_id)         
 
     def _help(self, bot, update):
         if self.access_check(update):
@@ -276,12 +266,6 @@ class Yuki_bot():
         self.tmp_find_csv_list = []
         self.tmp_find_file_dict = {}
 
-        self.tmp_status = {
-            'OpenVPN':True,
-            'Media':True
-        }
-
-
         self.guest_instruction_list = [
             '/get_uid',
             '/get_chatid',
@@ -307,7 +291,6 @@ class Yuki_bot():
             '/find_data',
             '/get_link',
 
-            '/set_status',
             '/update',
             '/save',
             '/load'
@@ -322,7 +305,6 @@ class Yuki_bot():
         dispatcher.add_handler( CommandHandler('test', self._test) )
 
         dispatcher.add_handler( CommandHandler('help', self._help) )
-        dispatcher.add_handler( CommandHandler('set_status', self._set_status, pass_args=True) )
 
         dispatcher.add_handler( CommandHandler('update', self._update) )
         dispatcher.add_handler( CommandHandler('save', self._save) )
