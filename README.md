@@ -1,8 +1,8 @@
 # Telegram File Sharing Robot
 這是一個 Telegram bot 他可以尋找檔案 並將檔案上傳到 Dropbox 以便分享檔案
 
-# 需求
-- [![](https://img.shields.io/pypi/pyversions/Django.svg)]
+# 環境
+![](https://img.shields.io/pypi/pyversions/Django.svg)
 
 # 指令說明
 - /update
