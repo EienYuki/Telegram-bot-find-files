@@ -2,6 +2,7 @@
 # 作者：EienYuki
 # https://github.com/EienYuki
 
+import csv
 import dropbox
 import hashlib
 import os, time, random
@@ -11,11 +12,13 @@ from telegram.ext import MessageHandler, Filters
 
 class Telegram_bot_find_files():
 
-    def log(self, info='', args=''):
-        if args is '':
-            print(time.strftime("%H:%M:%S", time.localtime()), info)
-        else:
+    def log(self, info='', args='', text=''):
+        if not args is '':
             print(time.strftime("%H:%M:%S", time.localtime()), info, ' '.join(args))
+        elif not text is '':
+            print(time.strftime("%H:%M:%S", time.localtime()), info, text)
+        else:
+            print(time.strftime("%H:%M:%S", time.localtime()), info)
 
     def access_check(self, update):
         self.log(info='access_check')
@@ -64,23 +67,28 @@ class Telegram_bot_find_files():
     def save_list(self, path, input_list):
         self.log(info='save_list')
 
-        with open(path, "w") as f:
+        with open(path, "w", newline='') as f:
+            writer = csv.writer(f, delimiter=',')
             for s in input_list:
-                f.write(str(s) +"\n")
+                if type(s) is str:
+                    writer.writerow([s])
+                else:
+                    writer.writerow(s)
 
     def load_list(self, path):
         self.log(info='load_list')
 
         out = []
-        with open(path, "r") as f:
-            for line in f:
-                out.append(line.strip())
+        with open(path, "r", newline='') as f:
+            reader = csv.reader(f, delimiter=',')
+            for row in reader:
+                out.append(row[0])
         return out
 
     def upload_file(self, path):
         # dropbox-api – Uploading a file using the Dropbox Python SDK - CodeDay
         # https://www.codeday.top/2017/10/24/52483.html
-        self.log(info='upload_file')
+        self.log(info='upload_file', text=path)
 
         dest_path = '/%s' % os.path.basename(path)
         dbx = dropbox.Dropbox(self.dropbox_token)
@@ -190,14 +198,14 @@ class Telegram_bot_find_files():
 
             if not text_caps in self.tmp_find_csv_list:
                 sha_1 = hashlib.sha1()
-                tp_now_find = ["ID,檔案"]
+                tp_now_find = [ ["ID", "檔案"] ]
                 for r in self.tmp_file_list:
                     if text_caps in r:
                         sha_1.update(r.encode())
                         tid = sha_1.hexdigest()
                         if not tid in self.tmp_find_file_dict:
                             self.tmp_find_file_dict[tid] = r
-                        tp_now_find.append(tid+","+r.strip())
+                        tp_now_find.append([tid, r.strip()])
                 self.save_list(tp_path,tp_now_find)
                 self.tmp_find_csv_list.append(text_caps)
             
