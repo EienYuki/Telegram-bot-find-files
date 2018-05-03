@@ -2,7 +2,7 @@
 這是一個 Telegram bot 他可以尋找檔案 並將檔案上傳到 Dropbox 以便分享檔案
 
 # 環境
-![](https://img.shields.io/pypi/pyversions/Django.svg)
+[![](https://img.shields.io/pypi/pyversions/Django.svg)](https://www.python.org/)
 
 # 指令說明
 - /update
